@@ -16,8 +16,6 @@ namespace ScannerListener
         [STAThread]
         static void Main()
         {
-            string port = ConfigurationManager.AppSettings["port"];
-
             // Get a list of serial port names.
             string[] ports = SerialPort.GetPortNames();
 
