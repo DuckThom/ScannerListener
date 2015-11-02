@@ -33,6 +33,7 @@
             this.label2 = new System.Windows.Forms.Label();
             this.portComboBox = new System.Windows.Forms.ComboBox();
             this.statusLabel = new System.Windows.Forms.Label();
+            this.stopButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // label1
@@ -84,11 +85,23 @@
             this.statusLabel.TabIndex = 4;
             this.statusLabel.Text = "Loading";
             // 
+            // stopButton
+            // 
+            this.stopButton.Location = new System.Drawing.Point(118, 32);
+            this.stopButton.Name = "stopButton";
+            this.stopButton.Size = new System.Drawing.Size(75, 23);
+            this.stopButton.TabIndex = 5;
+            this.stopButton.Text = "Stop";
+            this.stopButton.UseVisualStyleBackColor = true;
+            this.stopButton.Visible = false;
+            this.stopButton.Click += new System.EventHandler(this.stopButton_Click);
+            // 
             // ListeningForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(336, 122);
+            this.Controls.Add(this.stopButton);
             this.Controls.Add(this.statusLabel);
             this.Controls.Add(this.portComboBox);
             this.Controls.Add(this.label2);
@@ -111,6 +124,7 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.ComboBox portComboBox;
         private System.Windows.Forms.Label statusLabel;
+        private System.Windows.Forms.Button stopButton;
     }
 }
 

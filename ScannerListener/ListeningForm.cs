@@ -16,8 +16,8 @@ namespace ScannerListener
 {
     public partial class ListeningForm : Form
     {
-        string port = ConfigurationManager.AppSettings["port"];
-        bool _continue = false;
+        string _port = ConfigurationManager.AppSettings["port"];
+        string _path = ConfigurationManager.AppSettings["path"];
         string _filename;
         SerialPort _serialPort = new SerialPort();
         Thread _readThread;
@@ -35,27 +35,55 @@ namespace ScannerListener
                 portComboBox.Items.Add(port);
             }
 
+            SetStatus("Done");
+
             // Add an on change event handler to the combo box
             portComboBox.SelectedIndexChanged += new System.EventHandler(portComboBox_SelectedIndexChanged);
 
-            SetStatus("Done");
+            if (_port != "")
+            {
+                Console.WriteLine("Setting preferred COM port");
+                portComboBox.SelectedItem = _port;
+            }
         }
 
         private void portComboBox_SelectedIndexChanged(object sender, System.EventArgs e)
         {
             ComboBox comboBox = (ComboBox)sender;
 
-            // Stop a loop that might be running
-            _continue = false;
-            
-            // Close the port if it is already open
-            if (_serialPort.IsOpen)
+            if (comboBox.SelectedIndex != -1)
             {
-                _serialPort.Close();
-            }
+                string port = comboBox.SelectedItem.ToString();
 
-            // Try to start the thread
-            startThread(comboBox.SelectedItem.ToString());
+                if (port != "")
+                {
+                    // Close the port if it is already open
+                    if (_serialPort.IsOpen)
+                    {
+                        Console.WriteLine("[Error] Selected port in use");
+                        SetStatus("Selected port in use");
+                        return;
+                    }
+
+                    // Save the port to file
+                    SavePort(port);
+
+                    // Try to start the thread
+                    startThread(port);
+                }
+            }
+        }
+
+        private void SavePort(string port)
+        {
+            Configuration config = ConfigurationManager.OpenExeConfiguration(Application.ExecutablePath);
+
+            Console.WriteLine("Saving port to file");
+
+            config.AppSettings.Settings.Remove("port");
+            config.AppSettings.Settings.Add("port", port);
+
+            config.Save(ConfigurationSaveMode.Minimal);
         }
 
         private void startThread(string port)
@@ -78,9 +106,6 @@ namespace ScannerListener
                     // Open the port
                     _serialPort.Open();
 
-                    // Enable the loop
-                    _continue = true;
-
                     // Set the thread as background
                     _readThread.IsBackground = true;
 
@@ -95,6 +120,8 @@ namespace ScannerListener
 
                     // Set the status message
                     SetStatus("Listening on port " + port);
+
+                    stopButton.Visible = true;
                 }
                 catch (UnauthorizedAccessException)
                 {
@@ -111,7 +138,7 @@ namespace ScannerListener
 
         private void Read()
         {
-            while (_continue)
+            while (_serialPort.IsOpen)
             {
                 try
                 {
@@ -158,22 +185,64 @@ namespace ScannerListener
                         // Answer to the closure
                         _serialPort.Write(((char)6).ToString());
 
-                        _filename = WriteToFile(ByteArray);
+                        _filename = WriteToFile(ByteArray, _path);
 
                         SetStatus("Done");
+                    }
+
+                    if (message == "EINDE")
+                    {
+                        // Do print st00fs here
+                        Console.WriteLine("Initializing print job");
+
+                        int counter = 0;
+                        string line;
+
+                        // Read the file and display it line by line.
+                        StreamReader file = new StreamReader(_path + _filename);
+
+                        while ((line = file.ReadLine()) != null)
+                        {
+                            
+                            //Console.WriteLine(line.Substring(0, 12));
+                            //Console.WriteLine(line.Substring(12));
+                            counter++;
+                        }
+
+                        file.Close();
+
+                        Product[] test = new Product[counter];
+                        for (int i = 0; i < counter; i++)
+                        {
+                            test[i] = new Product(i + 5, i + i + 4, "noenoe", "aduard");
+                        }
+
+                        Console.WriteLine(test[2].getName());
                     }
                 }
                 catch (TimeoutException) {
                     Console.WriteLine("[TimeoutException] Timeout caught!");
                 }
+                catch (IOException)
+                {
+                    Console.WriteLine("[IOException] Probably caused by closed serial port while reading");
+                }
+                catch (InvalidOperationException)
+                {
+                    Console.WriteLine("[InvalidOperationException] Probably caused by closed serial port while reading");
+                }
             }
         }
 
         // Write the ByteArray to file
-        private string WriteToFile(byte[] ByteArray)
+        private string WriteToFile(byte[] ByteArray, string path)
         {
             string name = "GO_" + DateTime.Now.Day + DateTime.Now.Month + DateTime.Now.Year + DateTime.Now.Hour + DateTime.Now.Minute + DateTime.Now.Second + ".DAT";
-            string path = ConfigurationManager.AppSettings["path"];
+            
+            if (path == "")
+            {
+                path = Application.StartupPath;
+            }
 
             try
             {
@@ -182,6 +251,7 @@ namespace ScannerListener
 
                 foreach (byte Byte in ByteArray)
                 {
+                    // Write only some of the characters to the file
                     if (Byte != 0 && Byte < 60)
                     {
                         fs.WriteByte(Byte);
@@ -202,15 +272,32 @@ namespace ScannerListener
 
         private void SetStatus(string text)
         {
-            if (this.statusLabel.InvokeRequired)
+            if (statusLabel.InvokeRequired)
             {
                 SetTextCallback d = new SetTextCallback(SetStatus);
-                this.Invoke(d, new object[] { text });
+                Invoke(d, new object[] { text });
             }
             else
             {
-                this.statusLabel.Text = text;
+                statusLabel.Text = text;
             }
+        }
+
+        // Stop the listening thread
+        private void stopButton_Click(object sender, EventArgs e)
+        {
+            Button self = (Button)sender;
+
+            portComboBox.SelectedIndex = -1;
+            portLabel.Text = "Select a COM port from the dropdown menu";
+
+            SavePort("");
+
+            _serialPort.Close();
+
+            self.Visible = false;
+
+            SetStatus("Done");
         }
     }
 }
