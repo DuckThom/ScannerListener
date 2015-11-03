@@ -211,13 +211,13 @@ namespace ScannerListener
 
                         file.Close();
 
-                        Product[] test = new Product[counter];
+                        /*Product[] test = new Product[counter];
                         for (int i = 0; i < counter; i++)
                         {
                             test[i] = new Product(i + 5, i + i + 4, "noenoe", "aduard");
                         }
 
-                        Console.WriteLine(test[2].getName());
+                        Console.WriteLine(test[2].getName());*/
                     }
                 }
                 catch (TimeoutException) {

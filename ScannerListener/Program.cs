@@ -21,7 +21,20 @@ namespace ScannerListener
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new ListeningForm(ports));
+
+            if (ports.Length > 0)
+            {
+                Application.Run(new ListeningForm(ports));
+            } else
+            {
+                MessageBox.Show(
+                    "No COM ports were detected on this system",
+                    "No COM ports found",
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Error
+                );
+            }
+            
         }
     }
 }
