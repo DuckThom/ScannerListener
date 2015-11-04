@@ -226,7 +226,7 @@ namespace ScannerListener
                         for (int n = 0; n < products.Length; n++)
                         {
                             // Add the location and name from the database to the product object
-                            products[i] = UpdateProducts(products[i]);
+                            products[n] = UpdateProducts(products[n]);
                         }
 
                         // Print the data
@@ -327,6 +327,7 @@ namespace ScannerListener
             Console.WriteLine("Printing data");
             SetStatus("Printing data");
 
+            // Print st00fs
 
             SetStatus("Done!");
 
