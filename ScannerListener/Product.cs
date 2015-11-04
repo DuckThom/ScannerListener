@@ -8,12 +8,12 @@ namespace ScannerListener
 {
     class Product
     {
-        private int number;
-        private int qty;
+        private string number;
+        private string qty;
         private string name;
         private string location;
 
-        public Product(int number, int qty, string name, string location)
+        public Product(string number, string qty, string name, string location)
         {
             this.number = number;
             this.qty = qty;
@@ -21,12 +21,12 @@ namespace ScannerListener
             this.location = location;
         }
 
-        public int getNumber()
+        public string getNumber()
         {
             return number;
         }
 
-        public int getQty()
+        public string getQty()
         {
             return qty;
         }
@@ -39,6 +39,22 @@ namespace ScannerListener
         public string getLocation()
         {
             return location;
+        }
+
+        public void setName(string name)
+        {
+            if (name.Length > 0)
+            {
+                this.name = name;
+            }
+        }
+
+        public void setLocation(string location)
+        {
+            if (location.Length > 0)
+            {
+                this.location = location;
+            }
         }
     }
 }

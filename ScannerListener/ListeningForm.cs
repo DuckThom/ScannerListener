@@ -11,15 +11,20 @@ using System.Configuration;
 using System.Windows.Forms;
 using System.IO.Ports;
 using System.IO;
+using System.Data.OleDb;
 
 namespace ScannerListener
 {
     public partial class ListeningForm : Form
     {
         string _port = ConfigurationManager.AppSettings["port"];
-        string _path = ConfigurationManager.AppSettings["path"];
+        string _dbPath = ConfigurationManager.AppSettings["dbPath"];
+        string _path = Application.StartupPath;
         string _filename;
+
         SerialPort _serialPort = new SerialPort();
+        OleDbConnection _dbConnection = new OleDbConnection();
+
         Thread _readThread;
 
         delegate void SetTextCallback(string text);
@@ -142,8 +147,9 @@ namespace ScannerListener
             {
                 try
                 {
-                    string message = _serialPort.ReadTo("@");
+                    //string message = _serialPort.ReadTo("@");
                     // Console.WriteLine(message);
+                    string message = "EINDE";
 
                     if (message == "HALLO")
                     {
@@ -190,34 +196,41 @@ namespace ScannerListener
                         SetStatus("Done");
                     }
 
+                    // Read the file and send the data to the printer
                     if (message == "EINDE")
                     {
                         // Do print st00fs here
-                        Console.WriteLine("Initializing print job");
+                        Console.WriteLine("Reading file");
+                        SetStatus("Parsing data");
 
-                        int counter = 0;
-                        string line;
+                        int i = 0;
 
-                        // Read the file and display it line by line.
-                        StreamReader file = new StreamReader(_path + _filename);
+                        string[] file = File.ReadAllLines(Application.StartupPath + "/files/TEST.Dat");// + _filename);
 
-                        while ((line = file.ReadLine()) != null)
+                        Product[] products = new Product[file.Length];
+
+                        foreach (string line in file)
                         {
-                            
-                            //Console.WriteLine(line.Substring(0, 12));
-                            //Console.WriteLine(line.Substring(12));
-                            counter++;
+                            if (line != null)
+                            {
+                                string productNumber = line.Substring(0, 12);
+                                string productQty = line.Substring(12);
+
+                                Console.WriteLine(productNumber);
+
+                                products[i] = new Product(productNumber, productQty, "", "");
+                                i++;
+                            }
                         }
 
-                        file.Close();
-
-                        /*Product[] test = new Product[counter];
-                        for (int i = 0; i < counter; i++)
+                        for (int n = 0; n < products.Length; n++)
                         {
-                            test[i] = new Product(i + 5, i + i + 4, "noenoe", "aduard");
+                            // Add the location and name from the database to the product object
+                            products[i] = UpdateProducts(products[i]);
                         }
 
-                        Console.WriteLine(test[2].getName());*/
+                        // Print the data
+                        PrintData(products);
                     }
                 }
                 catch (TimeoutException) {
@@ -238,15 +251,10 @@ namespace ScannerListener
         private string WriteToFile(byte[] ByteArray, string path)
         {
             string name = "GO_" + DateTime.Now.Day + DateTime.Now.Month + DateTime.Now.Year + DateTime.Now.Hour + DateTime.Now.Minute + DateTime.Now.Second + ".DAT";
-            
-            if (path == "")
-            {
-                path = Application.StartupPath;
-            }
 
             try
             {
-                FileStream fs = File.OpenWrite(path + name);
+                FileStream fs = File.OpenWrite(_path + name);
                 SetStatus("Saving file...");
 
                 foreach (byte Byte in ByteArray)
@@ -283,6 +291,49 @@ namespace ScannerListener
             }
         }
 
+        private Product UpdateProducts(Product product)
+        {
+            OleDbConnection _dbConnection = new OleDbConnection();
+
+            _dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + Application.StartupPath + "/files/TestDB.accdb";//_dbPath;
+
+            DataSet dataSet = new DataSet();
+
+            var myAdapter = new OleDbDataAdapter();
+
+            OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE nummer ='" + product.getNumber() + "'", _dbConnection);
+
+            myAdapter.SelectCommand = command;
+            myAdapter.Fill(dataSet, "tblArtikelen");
+
+            DataRowCollection rowCollection = dataSet.Tables["tblArtikelen"].Rows;
+
+            foreach (DataRow row in rowCollection)
+            {
+                // Update the location and name in the product object
+                product.setLocation(row["lokatie"].ToString());
+                product.setName(row["naam"].ToString());
+            }
+
+            Console.WriteLine(product.getName());
+
+            _dbConnection.Close();
+
+            return product;
+        }
+
+        private void PrintData(Product[] products)
+        {
+            Console.WriteLine("Printing data");
+            SetStatus("Printing data");
+
+
+            SetStatus("Done!");
+
+            // Sleep for 2 seconds
+            Thread.Sleep(2000);
+        }
+
         // Stop the listening thread
         private void stopButton_Click(object sender, EventArgs e)
         {
@@ -293,7 +344,10 @@ namespace ScannerListener
 
             SavePort("");
 
-            _serialPort.Close();
+            if (_serialPort.IsOpen)
+            {
+                _serialPort.Close();
+            }
 
             self.Visible = false;
 

@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Configuration;
 using System.IO.Ports;
+using System.IO;
+using System.Data;
+using System.Data.OleDb;
 
 namespace ScannerListener
 {
@@ -23,7 +26,7 @@ namespace ScannerListener
             Application.SetCompatibleTextRenderingDefault(false);
 
             if (ports.Length > 0)
-            {
+            { 
                 Application.Run(new ListeningForm(ports));
             } else
             {
@@ -34,7 +37,6 @@ namespace ScannerListener
                     MessageBoxIcon.Error
                 );
             }
-            
         }
     }
 }
