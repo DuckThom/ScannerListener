@@ -1,13 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Configuration;
 using System.IO.Ports;
 using System.IO;
-using System.Data;
-using System.Data.OleDb;
 
 namespace ScannerListener
 {
@@ -21,13 +16,26 @@ namespace ScannerListener
         {
             // Get a list of serial port names.
             string[] ports = SerialPort.GetPortNames();
+            string dbPath = ConfigurationManager.AppSettings["dbPath"];
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
             if (ports.Length > 0)
-            { 
-                Application.Run(new ListeningForm(ports));
+            {
+                if (File.Exists(dbPath))
+                {
+                    Application.Run(new ListeningForm(ports));
+                } else
+                {
+                    MessageBox.Show(
+                        "Database file not found at: " + dbPath,
+                        "Database path invalid",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    );
+                }
+                
             } else
             {
                 MessageBox.Show(

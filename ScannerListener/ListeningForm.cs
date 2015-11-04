@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using System.IO.Ports;
 using System.IO;
 using System.Data.OleDb;
+using System.Drawing.Printing;
 
 namespace ScannerListener
 {
@@ -24,8 +25,10 @@ namespace ScannerListener
 
         SerialPort _serialPort = new SerialPort();
         OleDbConnection _dbConnection = new OleDbConnection();
+        Encoding _utf8 = Encoding.UTF8;
 
         Thread _readThread;
+        Product[] _products;
 
         delegate void SetTextCallback(string text);
 
@@ -40,7 +43,7 @@ namespace ScannerListener
                 portComboBox.Items.Add(port);
             }
 
-            SetStatus("Done");
+            SetStatus("Select a COM port");
 
             // Add an on change event handler to the combo box
             portComboBox.SelectedIndexChanged += new System.EventHandler(portComboBox_SelectedIndexChanged);
@@ -104,6 +107,7 @@ namespace ScannerListener
                     _serialPort.WriteTimeout = 5000; // 5 seconds
                     _serialPort.ReadTimeout = 5000; // 5 seconds
                     _serialPort.RtsEnable = true;
+                    _serialPort.Encoding = Encoding.UTF8;
 
                     // Allow the user to set the appropriate properties.
                     _serialPort.PortName = port;
@@ -123,14 +127,17 @@ namespace ScannerListener
                     // Stop the for loop
                     i = 6;
 
-                    // Set the status message
-                    SetStatus("Listening on port " + port);
-
                     stopButton.Visible = true;
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    Console.WriteLine("[UnauthorizedAccessException] Can't open device");
+                    MessageBox.Show(
+                            "Can't open COM port " + _port + "\r\nDevice is in use",
+                            "Unauthorized Access Exception",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error
+                        );
+                    SetStatus("Can't open device");
 
                     _serialPort = null; // Reset the serial port variable
                     _readThread = null; // Reset the thread port variable
@@ -147,19 +154,21 @@ namespace ScannerListener
             {
                 try
                 {
-                    //string message = _serialPort.ReadTo("@");
-                    // Console.WriteLine(message);
-                    string message = "EINDE";
+                    // Set the status message
+                    SetStatus("Listening on port " + _serialPort.PortName);
+
+                    string message = _serialPort.ReadTo("@");
+                    //Console.WriteLine(message);
 
                     if (message == "HALLO")
                     {
-                        Console.WriteLine("Sending ready signal");
+                        //Console.WriteLine("Sending ready signal");
                         _serialPort.Write("1");
-                        SetStatus("Receiving file...");
                     }
 
                     if (message == "START")
                     {
+                        SetStatus("Receiving file...");
                         Thread.Sleep(1000);
 
                         // Start the transfer
@@ -193,47 +202,62 @@ namespace ScannerListener
 
                         _filename = WriteToFile(ByteArray, _path);
 
-                        SetStatus("Done");
-                    }
-
-                    // Read the file and send the data to the printer
-                    if (message == "EINDE")
-                    {
-                        // Do print st00fs here
-                        Console.WriteLine("Reading file");
-                        SetStatus("Parsing data");
-
-                        int i = 0;
-
-                        string[] file = File.ReadAllLines(Application.StartupPath + "/files/TEST.Dat");// + _filename);
-
-                        Product[] products = new Product[file.Length];
-
-                        foreach (string line in file)
+                        // Read the file and send the data to the printer
+                        if (File.Exists(_path + "/files/" + _filename))
                         {
-                            if (line != null)
+                            //Console.WriteLine("Reading file");
+                            SetStatus("Parsing data");
+
+                            int i = 0;
+
+                            string[] file = File.ReadAllLines(Application.StartupPath + "/files/" + _filename);
+
+                            _products = new Product[file.Length];
+
+                            foreach (string line in file)
                             {
-                                string productNumber = line.Substring(0, 12);
-                                string productQty = line.Substring(12);
+                                if (line.Trim() != null)
+                                {
+                                    string productNumber = line.Substring(0, 7);
+                                    string productQty = line.Substring(7);
 
-                                Console.WriteLine(productNumber);
+                                    //Console.WriteLine(productNumber);
+                                    //Console.WriteLine(productQty);
 
-                                products[i] = new Product(productNumber, productQty, "", "");
-                                i++;
+                                    _products[i] = new Product(productNumber, productQty, "", "");
+                                    i++;
+                                }
                             }
-                        }
 
-                        for (int n = 0; n < products.Length; n++)
+                            try
+                            {
+                                for (int n = 0; n < _products.Length; n++)
+                                {
+                                    // Add the location and name from the database to the product object
+
+                                    _products[n] = UpdateProducts(_products[n]);
+                                }
+
+                                // Print the data
+                                PrintData();
+                            }
+                            catch (InvalidOperationException)
+                            {
+                                MessageBox.Show(
+                                        "Access 2007 Database driver not found",
+                                        "Invalid Operation Exception",
+                                        MessageBoxButtons.OK,
+                                        MessageBoxIcon.Error
+                                    );
+                            }
+                        } else
                         {
-                            // Add the location and name from the database to the product object
-                            products[n] = UpdateProducts(products[n]);
+                            Console.WriteLine("File not found");
                         }
-
-                        // Print the data
-                        PrintData(products);
                     }
                 }
-                catch (TimeoutException) {
+                catch (TimeoutException)
+                {
                     Console.WriteLine("[TimeoutException] Timeout caught!");
                 }
                 catch (IOException)
@@ -252,15 +276,37 @@ namespace ScannerListener
         {
             string name = "GO_" + DateTime.Now.Day + DateTime.Now.Month + DateTime.Now.Year + DateTime.Now.Hour + DateTime.Now.Minute + DateTime.Now.Second + ".DAT";
 
+            if (!Directory.Exists(_path + "/files"))
+            {
+                try
+                {
+                    Directory.CreateDirectory(_path + "/files");
+                }
+                catch (IOException)
+                {
+                    Console.WriteLine("[IOException] Could not create directory");
+
+                    MessageBox.Show(
+                        "Could not create 'files' directory in '" + _path + "' \r\nNo write rights?",
+                        "IOException",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    );
+
+                    return "";
+                }
+            }
+
             try
             {
-                FileStream fs = File.OpenWrite(_path + name);
+                // Save the .dat file to [EXE Location]/files/
+                FileStream fs = File.OpenWrite(_path + "/files/" + name);
                 SetStatus("Saving file...");
 
                 foreach (byte Byte in ByteArray)
                 {
                     // Write only some of the characters to the file
-                    if (Byte != 0 && Byte < 60)
+                    if (Byte != 0 && Byte != 1 && Byte != 4 && Byte != 12 && Byte < 58)
                     {
                         fs.WriteByte(Byte);
                     }
@@ -271,6 +317,7 @@ namespace ScannerListener
             catch (UnauthorizedAccessException)
             {
                 Console.WriteLine("[UnauthorizedAccessException] Could not open file");
+                SetStatus("Unable to save file");
 
                 return "";
             }
@@ -293,15 +340,17 @@ namespace ScannerListener
 
         private Product UpdateProducts(Product product)
         {
+            // Create a new connection instance
             OleDbConnection _dbConnection = new OleDbConnection();
 
-            _dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + Application.StartupPath + "/files/TestDB.accdb";//_dbPath;
+            // Set the provider and data source
+            _dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + _dbPath;
 
             DataSet dataSet = new DataSet();
 
             var myAdapter = new OleDbDataAdapter();
 
-            OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE nummer ='" + product.getNumber() + "'", _dbConnection);
+            OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE nummer = " + Int32.Parse(product.getNumber()), _dbConnection);
 
             myAdapter.SelectCommand = command;
             myAdapter.Fill(dataSet, "tblArtikelen");
@@ -315,24 +364,79 @@ namespace ScannerListener
                 product.setName(row["naam"].ToString());
             }
 
-            Console.WriteLine(product.getName());
-
             _dbConnection.Close();
 
             return product;
         }
 
-        private void PrintData(Product[] products)
+        private void PrintData()
         {
             Console.WriteLine("Printing data");
             SetStatus("Printing data");
 
-            // Print st00fs
+            PrintDialog printDialog = new PrintDialog();
+            PrintDocument printDocument = new PrintDocument();
+            PaperSize paperSize = new PaperSize();
+
+            paperSize.RawKind = (int)PaperKind.A4;
+            printDialog.Document = printDocument;
+
+            printDocument.DefaultPageSettings.Landscape = true;
+            printDocument.DefaultPageSettings.PaperSize = paperSize;
+            printDocument.PrintPage += new PrintPageEventHandler(printDocument_PrintPage);
+
+            DialogResult result = printDialog.ShowDialog();
+
+            if (result == DialogResult.OK)
+            {
+                printDocument.Print();
+            }
 
             SetStatus("Done!");
 
             // Sleep for 2 seconds
             Thread.Sleep(2000);
+        }
+
+        private void printDocument_PrintPage(object sender, PrintPageEventArgs e)
+        {
+            Graphics graphic = e.Graphics;
+
+            Font titleFont = new Font("Courier New", 12, FontStyle.Bold);
+            Font mainFont = new Font("Courier New", 12);
+
+            SolidBrush brush = new SolidBrush(Color.Black);
+
+            float titleHeight = titleFont.GetHeight();
+            float mainHeight = mainFont.GetHeight();
+
+            int startX = 10;
+            int startY = 10;
+            int offset = 40;
+
+            string checkbox = "\u25A1".PadRight(10);
+            string header = "Aantal".PadRight(10) + "Controle".PadRight(10) + "Artikel Nr.".PadRight(15) + "Omschrijving".PadRight(50) + "Locatie".PadRight(10);
+
+            graphic.DrawString(header, titleFont, brush, startX, startY);
+
+            graphic.DrawLine(new Pen(brush), new Point(0, startY + offset), new Point(e.PageBounds.Width, startY + offset));
+
+            offset = offset + (int)titleHeight + 10;
+
+            foreach (Product product in _products)
+            {
+                string qty = product.getQty().PadRight(10);
+                
+                string number = product.getNumber().PadRight(15);
+                string name = product.getName().PadRight(50);
+                string location = product.getLocation().PadRight(10);
+
+                string productLine = qty + checkbox + number + name + location;
+
+                graphic.DrawString(productLine, mainFont, brush, startX, startY + offset);
+
+                offset = offset + (int)mainHeight + 5;
+            }
         }
 
         // Stop the listening thread
