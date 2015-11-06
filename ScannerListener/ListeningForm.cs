@@ -24,7 +24,7 @@ namespace ScannerListener
         string _filename;
 
         SerialPort _serialPort = new SerialPort();
-        OleDbConnection _dbConnection = new OleDbConnection();
+        //OleDbConnection _dbConnection = new OleDbConnection();
         Encoding _utf8 = Encoding.UTF8;
 
         Thread _readThread;
@@ -224,7 +224,7 @@ namespace ScannerListener
                                     //Console.WriteLine(productNumber);
                                     //Console.WriteLine(productQty);
 
-                                    _products[i] = new Product(productNumber, productQty, "", "");
+                                    _products[i] = new Product(productNumber, productQty, "", "", "");
                                     i++;
                                 }
                             }
@@ -241,10 +241,10 @@ namespace ScannerListener
                                 // Print the data
                                 PrintData();
                             }
-                            catch (InvalidOperationException)
+                            catch (InvalidOperationException e)
                             {
                                 MessageBox.Show(
-                                        "Access 2007 Database driver not found",
+                                        e.Message,
                                         "Invalid Operation Exception",
                                         MessageBoxButtons.OK,
                                         MessageBoxIcon.Error
@@ -341,16 +341,16 @@ namespace ScannerListener
         private Product UpdateProducts(Product product)
         {
             // Create a new connection instance
-            OleDbConnection _dbConnection = new OleDbConnection();
+            OleDbConnection dbConnection = new OleDbConnection();
 
             // Set the provider and data source
-            _dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + _dbPath;
+            dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + _dbPath;
 
             DataSet dataSet = new DataSet();
 
-            var myAdapter = new OleDbDataAdapter();
+            OleDbDataAdapter myAdapter = new OleDbDataAdapter();
 
-            OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE nummer = " + Int32.Parse(product.getNumber()), _dbConnection);
+            OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE Omnivers_nummer = " + Int32.Parse(product.getNumber()), dbConnection);
 
             myAdapter.SelectCommand = command;
             myAdapter.Fill(dataSet, "tblArtikelen");
@@ -360,11 +360,12 @@ namespace ScannerListener
             foreach (DataRow row in rowCollection)
             {
                 // Update the location and name in the product object
-                product.setLocation(row["lokatie"].ToString());
-                product.setName(row["naam"].ToString());
+                product.setLocation(row["Locatie"].ToString());
+                product.setName(row["Omschrijving1"].ToString());
+                product.setEAN(row["extArtikelcode"].ToString());
             }
 
-            _dbConnection.Close();
+            dbConnection.Close();
 
             return product;
         }
@@ -415,7 +416,7 @@ namespace ScannerListener
             int offset = 40;
 
             string checkbox = "\u25A1".PadRight(10);
-            string header = "Aantal".PadRight(10) + "Controle".PadRight(10) + "Artikel Nr.".PadRight(15) + "Omschrijving".PadRight(50) + "Locatie".PadRight(10);
+            string header = "Aantal".PadRight(10) + "Controle".PadRight(10) + "Artikel Nr.".PadRight(15) + "Omschrijving".PadRight(50) + "Locatie".PadRight(10) + "EAN".PadRight(16);
 
             graphic.DrawString(header, titleFont, brush, startX, startY);
 
@@ -430,8 +431,9 @@ namespace ScannerListener
                 string number = product.getNumber().PadRight(15);
                 string name = product.getName().PadRight(50);
                 string location = product.getLocation().PadRight(10);
+                string ean = product.getEAN().PadRight(16);
 
-                string productLine = qty + checkbox + number + name + location;
+                string productLine = qty + checkbox + number + name + location + ean;
 
                 graphic.DrawString(productLine, mainFont, brush, startX, startY + offset);
 

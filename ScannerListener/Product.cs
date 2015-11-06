@@ -12,13 +12,15 @@ namespace ScannerListener
         private string qty;
         private string name;
         private string location;
+        private string ean;
 
-        public Product(string number, string qty, string name, string location)
+        public Product(string number, string qty, string name, string location, string ean)
         {
             this.number = number;
             this.qty = qty;
             this.name = name;
             this.location = location;
+            this.ean = ean;
         }
 
         public string getNumber()
@@ -41,6 +43,11 @@ namespace ScannerListener
             return location;
         }
 
+        public string getEAN()
+        {
+            return ean;
+        }
+
         public void setName(string name)
         {
             if (name.Length > 0)
@@ -54,6 +61,14 @@ namespace ScannerListener
             if (location.Length > 0)
             {
                 this.location = location;
+            }
+        }
+
+        public void setEAN(string ean)
+        {
+            if (ean.Length > 0)
+            {
+                this.ean = ean;
             }
         }
     }
