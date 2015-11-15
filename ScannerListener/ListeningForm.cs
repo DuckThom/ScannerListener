@@ -216,7 +216,7 @@ namespace ScannerListener
 
                             foreach (string line in file)
                             {
-                                if (line.Trim() != null)
+                                if (line.Trim() != null && line.Length > 7)
                                 {
                                     string productNumber = line.Substring(0, 7);
                                     string productQty = line.Substring(7);
@@ -306,7 +306,7 @@ namespace ScannerListener
                 foreach (byte Byte in ByteArray)
                 {
                     // Write only some of the characters to the file
-                    if (Byte != 0 && Byte != 1 && Byte != 4 && Byte != 12 && Byte < 58)
+                    if (Byte > 10 && Byte < 58)
                     {
                         fs.WriteByte(Byte);
                     }
@@ -340,32 +340,42 @@ namespace ScannerListener
 
         private Product UpdateProducts(Product product)
         {
-            // Create a new connection instance
-            OleDbConnection dbConnection = new OleDbConnection();
-
-            // Set the provider and data source
-            dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + _dbPath;
-
-            DataSet dataSet = new DataSet();
-
-            OleDbDataAdapter myAdapter = new OleDbDataAdapter();
-
-            OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE Omnivers_nummer = " + Int32.Parse(product.getNumber()), dbConnection);
-
-            myAdapter.SelectCommand = command;
-            myAdapter.Fill(dataSet, "tblArtikelen");
-
-            DataRowCollection rowCollection = dataSet.Tables["tblArtikelen"].Rows;
-
-            foreach (DataRow row in rowCollection)
+            if (product != null)
             {
-                // Update the location and name in the product object
-                product.setLocation(row["Locatie"].ToString());
-                product.setName(row["Omschrijving1"].ToString());
-                product.setEAN(row["extArtikelcode"].ToString());
-            }
+                // Create a new connection instance
+                OleDbConnection dbConnection = new OleDbConnection();
 
-            dbConnection.Close();
+                // Set the provider and data source
+                dbConnection.ConnectionString = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + _dbPath.Replace("/", "\\") + ";Persist Security Info=False;";
+
+                dbConnection.Open();
+
+                DataSet dataSet = new DataSet();
+
+                OleDbDataAdapter myAdapter = new OleDbDataAdapter();
+
+                OleDbCommand command = new OleDbCommand("SELECT * FROM tblArtikelen WHERE Omnivers_nummer = '" + product.getNumber() + "'", dbConnection);
+
+                myAdapter.SelectCommand = command;
+                myAdapter.Fill(dataSet, "tblArtikelen");
+
+                if (dataSet != null)
+                {
+                    DataRowCollection rowCollection = dataSet.Tables["tblArtikelen"].Rows;
+
+                    foreach (DataRow row in rowCollection)
+                    {
+                        // Update the location and name in the product object
+                        product.setLocation(row["Locatie"].ToString());
+                        product.setName(row["Omschrijving1"].ToString());
+                        product.setEAN(row["extArtikelcode"].ToString());
+                    }
+                }
+
+                dbConnection.Close();
+
+                return product;
+            }
 
             return product;
         }
@@ -375,28 +385,21 @@ namespace ScannerListener
             Console.WriteLine("Printing data");
             SetStatus("Printing data");
 
-            PrintDialog printDialog = new PrintDialog();
             PrintDocument printDocument = new PrintDocument();
             PaperSize paperSize = new PaperSize();
 
             paperSize.RawKind = (int)PaperKind.A4;
-            printDialog.Document = printDocument;
 
             printDocument.DefaultPageSettings.Landscape = true;
             printDocument.DefaultPageSettings.PaperSize = paperSize;
             printDocument.PrintPage += new PrintPageEventHandler(printDocument_PrintPage);
 
-            DialogResult result = printDialog.ShowDialog();
-
-            if (result == DialogResult.OK)
-            {
-                printDocument.Print();
-            }
-
-            SetStatus("Done!");
+            printDocument.Print();
 
             // Sleep for 2 seconds
             Thread.Sleep(2000);
+
+            SetStatus("Done!");
         }
 
         private void printDocument_PrintPage(object sender, PrintPageEventArgs e)
@@ -416,7 +419,7 @@ namespace ScannerListener
             int offset = 40;
 
             string checkbox = "\u25A1".PadRight(10);
-            string header = "Aantal".PadRight(10) + "Controle".PadRight(10) + "Artikel Nr.".PadRight(15) + "Omschrijving".PadRight(50) + "Locatie".PadRight(10) + "EAN".PadRight(16);
+            string header = "Aantal".PadRight(10) + "Controle".PadRight(10) + "Artikel Nr.".PadRight(15) + "Omschrijving".PadRight(45) + "Locatie".PadRight(10) + "EAN".PadRight(16);
 
             graphic.DrawString(header, titleFont, brush, startX, startY);
 
@@ -426,18 +429,21 @@ namespace ScannerListener
 
             foreach (Product product in _products)
             {
-                string qty = product.getQty().PadRight(10);
-                
-                string number = product.getNumber().PadRight(15);
-                string name = product.getName().PadRight(50);
-                string location = product.getLocation().PadRight(10);
-                string ean = product.getEAN().PadRight(16);
+                if (product != null)
+                {
+                    string qty = product.getQty().PadRight(10);
 
-                string productLine = qty + checkbox + number + name + location + ean;
+                    string number = product.getNumber().PadRight(15);
+                    string name = product.getName().PadRight(45);
+                    string location = product.getLocation().PadRight(10);
+                    string ean = product.getEAN().PadRight(16);
 
-                graphic.DrawString(productLine, mainFont, brush, startX, startY + offset);
+                    string productLine = qty + checkbox + number + name + location + ean;
 
-                offset = offset + (int)mainHeight + 5;
+                    graphic.DrawString(productLine, mainFont, brush, startX, startY + offset);
+
+                    offset = offset + (int)mainHeight + 5;
+                }
             }
         }
 
