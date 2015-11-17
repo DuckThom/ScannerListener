@@ -23,6 +23,9 @@ namespace ScannerListener
         string _path = Application.StartupPath;
         string _filename;
 
+        int _totalPrinted = 0;
+        int _totalToPrint = 0;
+
         SerialPort _serialPort = new SerialPort();
         //OleDbConnection _dbConnection = new OleDbConnection();
         Encoding _utf8 = Encoding.UTF8;
@@ -177,6 +180,7 @@ namespace ScannerListener
                         Thread.Sleep(1000);
 
                         // Answer to the first response
+                        Console.WriteLine(_serialPort.ReadByte());
                         _serialPort.Write(((char)6).ToString() + "C");
 
                         // Clear the input buffer
@@ -187,20 +191,42 @@ namespace ScannerListener
                         // Answer to the data
                         _serialPort.Write(((char)6).ToString());
                         Thread.Sleep(100);
-                        _serialPort.Write(((char)21).ToString());
+                        //_serialPort.Write(((char)21).ToString());
                         Thread.Sleep(100);
                         _serialPort.Write(((char)6).ToString() + "C");
                         Thread.Sleep(1000);
 
                         // Read the data
                         int count = _serialPort.BytesToRead;
-                        byte[] ByteArray = new byte[count];
-                        _serialPort.Read(ByteArray, 0, count);
+                        //byte[] ByteArray = new byte[count];
 
-                        // Answer to the closure
+                        //while (_serialPort.Read(ByteArray, 0, count));
+                        byte[] buffer = new byte[count];
+                        int offset = 0;
+                        int toRead = count;
+
+                        int read;
+                        while (toRead > 0 && (read = _serialPort.Read(buffer, offset, toRead)) > 0)
+                        {
+                            offset += read;
+                            toRead -= read;
+                        }
+                        if (toRead > 0) throw new EndOfStreamException();
+
+                        Thread.Sleep(1000);
+
+                        Console.WriteLine(buffer.Length);
+
+                        for (double i = Math.Round((double)((buffer.Length - 765) / 1000)); i > 0.0; i--)
+                        {
+                            // Answer to the closure
+                            _serialPort.Write(((char)6).ToString() + "C");
+                            Thread.Sleep(1000);
+                        }
+
                         _serialPort.Write(((char)6).ToString());
 
-                        _filename = WriteToFile(ByteArray, _path);
+                        _filename = WriteToFile(buffer, _path);
 
                         // Read the file and send the data to the printer
                         if (File.Exists(_path + "/files/" + _filename))
@@ -224,7 +250,7 @@ namespace ScannerListener
                                     //Console.WriteLine(productNumber);
                                     //Console.WriteLine(productQty);
 
-                                    _products[i] = new Product(productNumber, productQty, "", "", "");
+                                    _products[i] = new Product(productNumber, productQty, "", "", "", true);
                                     i++;
                                 }
                             }
@@ -385,6 +411,14 @@ namespace ScannerListener
             Console.WriteLine("Printing data");
             SetStatus("Printing data");
 
+            foreach (Product product in _products)
+            {
+                if (product != null)
+                {
+                    _totalToPrint++;
+                }
+            }
+
             PrintDocument printDocument = new PrintDocument();
             PaperSize paperSize = new PaperSize();
 
@@ -400,6 +434,9 @@ namespace ScannerListener
             Thread.Sleep(2000);
 
             SetStatus("Done!");
+
+            _totalPrinted = 0;
+            _totalToPrint = 0;
         }
 
         private void printDocument_PrintPage(object sender, PrintPageEventArgs e)
@@ -417,6 +454,7 @@ namespace ScannerListener
             int startX = 10;
             int startY = 10;
             int offset = 40;
+            int count = 0;
 
             string checkbox = "\u25A1".PadRight(10);
             string header = "Aantal".PadRight(10) + "Controle".PadRight(10) + "Artikel Nr.".PadRight(15) + "Omschrijving".PadRight(45) + "Locatie".PadRight(10) + "EAN".PadRight(16);
@@ -429,7 +467,7 @@ namespace ScannerListener
 
             foreach (Product product in _products)
             {
-                if (product != null)
+                if (product != null && product.getPrint() == true && count < 31)
                 {
                     string qty = product.getQty().PadRight(10);
 
@@ -443,7 +481,18 @@ namespace ScannerListener
                     graphic.DrawString(productLine, mainFont, brush, startX, startY + offset);
 
                     offset = offset + (int)mainHeight + 5;
+
+                    product.setPrint(false);
+
+                    count++;
                 }
+            }
+
+            _totalPrinted = _totalPrinted + count;
+
+            if (_totalPrinted < _totalToPrint)
+            {
+                e.HasMorePages = true;
             }
         }
 
@@ -461,6 +510,8 @@ namespace ScannerListener
             {
                 _serialPort.Close();
             }
+
+            _totalPrinted = 0;
 
             self.Visible = false;
 

@@ -13,14 +13,16 @@ namespace ScannerListener
         private string name;
         private string location;
         private string ean;
+        private bool print;
 
-        public Product(string number, string qty, string name, string location, string ean)
+        public Product(string number, string qty, string name, string location, string ean, bool print)
         {
             this.number = number;
             this.qty = qty;
             this.name = name;
             this.location = location;
             this.ean = ean;
+            this.print = print;
         }
 
         public string getNumber()
@@ -48,6 +50,11 @@ namespace ScannerListener
             return ean;
         }
 
+        public bool getPrint()
+        {
+            return print;
+        }
+
         public void setName(string name)
         {
             if (name.Length > 0)
@@ -70,6 +77,11 @@ namespace ScannerListener
             {
                 this.ean = ean;
             }
+        }
+
+        public void setPrint(bool print)
+        {
+            this.print = print;
         }
     }
 }
